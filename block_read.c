@@ -1,6 +1,9 @@
 /*
  * This file is for learning block reading. 
- *
+ * This file is very ugly, not thinking fllowing:
+ * continue write
+ * not have real data!
+ * and so on
  * */
 
 #include <linux/init.h>
@@ -44,6 +47,10 @@ static void br_set_reabable(bool v)
     mutex_unlock(&br_rw_mutex);
 }
 
+static bool br_get_readable(void)
+{
+    return is_readable;
+}
 static int brreal_open(struct inode* inode, struct file* filep)
 {
     return 0;
@@ -53,16 +60,30 @@ static ssize_t brreal_read(struct file* filep, char *buf,
         size_t cnt, loff_t* ppos)
 {
     unsigned long sz;
+    bool v;
     printk("br read! start\n");
+
+    if (filep->f_flags & O_NONBLOCK)
+    {
+        printk("nonblock fd!\n");
+        if ( br_readable() )
+        {
+            goto lab_read;
+        }
+        else
+            return -EAGAIN;
+    }
 
     if (wait_event_interruptible(br_wait_queue, br_readable()) != 0)
     {
         return -ERESTARTSYS;
     }
 
-    
+lab_read:
+    v = br_get_readable();
+    printk("readable flag:%d\n", v);
     sz = min_t(unsigned long, sizeof(is_readable), cnt);
-    if (copy_to_user(buf, &is_readable, sz))
+    if (copy_to_user(buf, &v, sz))
     {
         return -EFAULT;
     }
